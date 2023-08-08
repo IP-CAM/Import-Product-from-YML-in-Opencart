@@ -78,6 +78,9 @@ $model_supplier = $registry->get('model_tool_supplier');
 $loader->model('catalog/manufacturer');
 $model_manufacturer = $registry->get('model_catalog_manufacturer');
 
+$loader->model('catalog/filter');
+$model_filter = $registry->get('model_catalog_filter');
+
  
 $data = simplexml_load_file('https://humidorpro.ru/yandex-yml.xml');
 
@@ -112,22 +115,27 @@ foreach ($data->shop->offers->offer as $row) {
 
 
     if(!$find) {
-        // echo 'Товара нет: ' . $row->name . ' ' . $row->sku;
-        // echo ' (' .  getCategory($row->categoryId, $data) . ')';
-        // $i++;
-        // echo ' - Нужно добавить: ' . $i . ' товаров' .PHP_EOL;
-        if($row->sku == '151-10-BlackU') {
-            $image_counter = 0;
-            $images = array();
-            foreach ($row->picture as $picture) {
-                $image = getImage($picture);
-                $images[] = $image;
-                $image_counter++;
-            }
+        $main_cat = getCategory($row->categoryId, $data);
+        if(!in_array($main_cat, $RESTRICTED_CATEGORY_SUPPLIER)) {
+            echo 'Товара нет: ' . $row->name . ' ' . $row->sku;
+            echo ' (' .  getCategory($row->categoryId, $data) . ')';
+            $i++;
+            echo ' - Нужно добавить: ' . $i . ' товаров' .PHP_EOL;
+            generateFilters($row->param);
+            if($row->sku == '151-10-BlackU') {
+                $image_counter = 0;
+                $images = array();
+                foreach ($row->picture as $picture) {
+                    $image = getImage($picture);
+                    $images[] = $image;
+                    $image_counter++;
+                }
 
-            $product_id = addNewProduct($row, $images);
-            echo 'id: ' . $product_id;
+                $product_id = addNewProduct($row, $images);
+                
+            }
         }
+       
     } else {
         if(isAllowedProduct($product_data)) {
             $old_price = intval($price);
@@ -268,15 +276,56 @@ function addNewProduct($productData, $images) : int {
         //         )
         //     ),
         // ),
-        'product_image' => $add_images
+        'product_image' => $add_images,
+        'product_filter' => array(
+            1, 2 , 3
+        )
     );
-
-    print_r(gettype($images[0]));
-    print_r($prod_data);
 
     // $product_id = $model->autoAddProduct($prod_data);
 
     $product_id = 2;
 
     return $product_id;
+}
+
+
+// function generateAttributes($params) : array {
+
+// }
+
+function generateFilters($params)  {
+    global $model_filter;
+
+    foreach($params as $param) {
+        if($param['name'] == 'Материал') {
+            $filter_name = explode(', ', mb_strtolower(strval($param), 'utf-8'));
+            $filter_name = implode(';', $filter_name);
+            $data = array(
+                'filter_name' => $filter_name,
+                'filter_group_id' => 10
+            );
+
+
+            $existing_filters = $model_filter->getFilters($data);
+
+            $flag = 0;
+            $filter = array();
+
+            foreach($existing_filters as $existing_filter) {
+                if($filter_name == $existing_filter['name']) {
+                    $flag = 1;
+                    $filter = $existing_filter;
+                }
+            }
+
+            if($flag) {
+                echo $filter['filter_id'] . PHP_EOL;
+                echo $filter['name'] . PHP_EOL;
+            } else {
+                echo 'Фильтра нет ||||||' . PHP_EOL;
+            }
+
+        }
+    }
 }
