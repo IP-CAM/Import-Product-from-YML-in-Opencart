@@ -87,79 +87,84 @@ $data = simplexml_load_file('https://humidorpro.ru/yandex-yml.xml');
 $i = 0;
 $k = 0;
 $j = 0;
-foreach ($data->shop->offers->offer as $row) {
+// foreach ($data->shop->offers->offer as $row) {
 
-    $data['filter_model'] = $row->sku;
-    $result = $model->getProducts($data);
-    $k ++;
+//     $data['filter_model'] = $row->sku;
+//     $result = $model->getProducts($data);
+//     $k ++;
 
-    $find = 0;
-    $product_id = 0;
-    $price = 0;
-    $name = '';
-    $model_sku = '';
-    $product_data = array();
+//     $find = 0;
+//     $product_id = 0;
+//     $price = 0;
+//     $name = '';
+//     $model_sku = '';
+//     $product_data = array();
 
-    // дополнительная проверка, так как модель позвращает не полное сходство, а вхождение
-    foreach($result as $product) {
-        if ($product['model'] == $row->sku) {
-            $find = 1;
-            $product_id = $product['product_id'];
-            $price = $product['price'];
-            $name = $product['name'];
-            $model_sku = $product['model'];
-            $product_data = $product;
-            // print_r($model->getProductAttributes($product_id));
-        }
-    }
+//     // дополнительная проверка, так как модель позвращает не полное сходство, а вхождение
+//     foreach($result as $product) {
+//         if ($product['model'] == $row->sku) {
+//             $find = 1;
+//             $product_id = $product['product_id'];
+//             $price = $product['price'];
+//             $name = $product['name'];
+//             $model_sku = $product['model'];
+//             $product_data = $product;
+//             // print_r($model->getProductAttributes($product_id));
+//         }
+//     }
 
 
-    if(!$find) {
-        $main_cat = getCategory($row->categoryId, $data);
-        if(!in_array($main_cat, $RESTRICTED_CATEGORY_SUPPLIER)) {
-            echo 'Товара нет: ' . $row->name . ' ' . $row->sku;
-            echo ' (' .  getCategory($row->categoryId, $data) . ')';
-            $i++;
-            echo ' - Нужно добавить: ' . $i . ' товаров' .PHP_EOL;
-            generateFilters($row->param);
-            if($row->sku == '151-10-BlackU') {
-                $image_counter = 0;
-                $images = array();
-                foreach ($row->picture as $picture) {
-                    $image = getImage($picture);
-                    $images[] = $image;
-                    $image_counter++;
-                }
+//     if(!$find) {
+//         $main_cat = getCategory($row->categoryId, $data);
+//         if(!in_array($main_cat, $RESTRICTED_CATEGORY_SUPPLIER)) {
+//             echo 'Товара нет: ' . $row->name . ' ' . $row->sku;
+//             echo ' (' .  getCategory($row->categoryId, $data) . ')';
+//             $i++;
+//             echo ' - Нужно добавить: ' . $i . ' товаров' .PHP_EOL;
 
-                $product_id = addNewProduct($row, $images);
-                
-            }
-        }
+//             $image_counter = 0;
+//             $images = array();
+//             foreach ($row->picture as $picture) {
+//                 $image = getImage($picture);
+//                 $images[] = $image;
+//                 $image_counter++;
+//                 echo 'Добавили изображение для товара: ' . $row->name . ' (' . $image . ' ) - ' . $image_counter . PHP_EOL;
+//             }
+
+//             $product_id = addNewProduct($row, $images);
+//         }
        
-    } else {
-        if(isAllowedProduct($product_data)) {
-            $old_price = intval($price);
-            $new_price = generatePrice($row->price);
-            if($new_price != $old_price) {
-                $j++;
-                $data_prod['model'] = $row->sku;
-                $data_prod['price'] = $new_price;
-                $data_prod['quantity'] = 20;
-                $model_supplier->editProduct($product_id, $data_prod);
-                echo 'Обновление цены: ' . $name . ' "' . $row->sku .  '"';
-                echo ' (с ' . $old_price . ' на ' . $new_price . ') ';
-                echo ' - Количесто обновлений: ' . $j . ' товаров' .PHP_EOL;
+//     } else {
+//         echo 'Товар есть в нашей системе, проверяем разрешено ли нам его обновлять' . PHP_EOL;
+//         if(isAllowedProduct($product_data)) {
+//             $old_price = intval($price);
+//             $new_price = generatePrice($row->price);
+//             if($new_price != $old_price) {
+//                 $j++;
+//                 $data_prod['model'] = $row->sku;
+//                 $data_prod['price'] = $new_price;
+//                 $data_prod['quantity'] = 20;
+//                 $model_supplier->editProduct($product_id, $data_prod);
+//                 echo 'Обновление цены: ' . $name . ' "' . $row->sku .  '"';
+//                 echo ' (с ' . $old_price . ' на ' . $new_price . ') ';
+//                 echo ' - Количесто обновлений: ' . $j . ' товаров' .PHP_EOL;
                 
-            }
-        }
+//             } else {
+//                 echo 'Цена на товар: ' . $product_data['name'] . ' не изменилась' . PHP_EOL;
+//             }
+//         } else {
+//             echo 'Товар не этого поставщика: ' . $product_data['name'] . PHP_EOL;
+//         }
         
-    }
-}
+//     }
+// }
 
 
 
-echo 'Всего товаров: ' . $k;
+// echo 'Всего товаров: ' . $k;
 
+
+updatingProductStocks();
 
 function generatePrice($supplier_price) : int {
     if(intval($supplier_price) < 6000) {
@@ -226,11 +231,17 @@ function addNewProduct($productData, $images) : int {
             );
         }
     }
+
+    echo 'Начали добавлять товар: ' . strval($productData->name) . PHP_EOL;
+
+    $product_filter = generateFilters($productData->param);
+    $manufacturer_id = generateManufacturer($productData->param);
+    $price = generatePrice($productData->price);
     
     $prod_data = array(
         'product_description' => array(
             1 => array(
-                'name' => strval($productData->name),
+                'name' => strval($productData->name) . ' (autoadd)',
                 'description' => strval($productData->description),
                 'meta_title' => strval($productData->name),
                 'meta_h1' => '',
@@ -247,11 +258,11 @@ function addNewProduct($productData, $images) : int {
         'isbn' => "",
         'mpn' => "",
         'location' => "",
-        'price' => generatePrice($productData->price),
+        'price' => $price,
         'tax_class_id' => "0",
         'quantity' => "50",
         'minimum' => "1",
-        'subtract' => "1",
+        'subtract' => "0",
         'stock_status_id' => "5",
         'shipping' => "1",
         'date_available' => '0000-00-00',
@@ -263,39 +274,23 @@ function addNewProduct($productData, $images) : int {
         'weight_class_id' => "1",
         'status' => 0,
         'sort_order' => "0",
-        'manufacturer_id' => "0",
+        'manufacturer_id' => $manufacturer_id,
         'image' => $images[0],
         'points' => "",
-        // 'product_attribute' => array(
-        //     array(
-        //         'attribute_id' => 10,
-        //         'product_attribute_description' => array(
-        //             1 => array(
-        //                 'text' => 'test'
-        //             )
-        //         )
-        //     ),
-        // ),
         'product_image' => $add_images,
-        'product_filter' => array(
-            1, 2 , 3
-        )
+        'product_filter' => $product_filter
     );
 
-    // $product_id = $model->autoAddProduct($prod_data);
+    $product_id = $model->autoAddProduct($prod_data);
 
-    $product_id = 2;
+    echo 'Созадил товар: ' . strval($productData->name) . ' (autoadd)' . ' ('.strval($productData->sku).') ' . ' || Закупочная цена: ' . $productData->price . ' || Цена в магазине: ' . $price . PHP_EOL;
 
     return $product_id;
 }
 
-
-// function generateAttributes($params) : array {
-
-// }
-
-function generateFilters($params)  {
+function generateFilters($params) : array {
     global $model_filter;
+    $filter_info = array();
 
     foreach($params as $param) {
         if($param['name'] == 'Материал') {
@@ -320,12 +315,128 @@ function generateFilters($params)  {
             }
 
             if($flag) {
-                echo $filter['filter_id'] . PHP_EOL;
-                echo $filter['name'] . PHP_EOL;
+                $filter_info[] = $filter['filter_id'];
             } else {
-                echo 'Фильтра нет ||||||' . PHP_EOL;
+                $filter_data = array(
+                    'filter_group_id' => 10,
+                    'filter_description' => array(
+                        1 => array(
+                            'name' => $filter_name
+                        )
+                    )
+                );
+                $filter_id = $model_filter->autoAddFilter($filter_data);
+                $filter_info[] = $filter_id;
             }
+
+            echo 'Добавили фильтр по материалу: ' . $filter_name . PHP_EOL;
+        }
+        if($param['name'] == 'Производитель') {
+            $data_array = explode(', ', mb_strtolower(strval($param), 'utf-8'));
+            $filter_name = '';
+            if(count($data_array) == 2) {
+                $filter_name = $data_array[1];
+            } elseif (count($data_array) == 1) {
+                $filter_name = $data_array[0];
+            }
+
+            $data = array(
+                'filter_name' => $filter_name,
+                'filter_group_id' => 5
+            );
+
+            $existing_filters = $model_filter->getFilters($data);
+
+            $flag = 0;
+            $filter = array();
+
+            foreach($existing_filters as $existing_filter) {
+                if($filter_name == $existing_filter['name']) {
+                    $flag = 1;
+                    $filter = $existing_filter;
+                }
+            }
+
+            if($flag) {
+                $filter_info[] = $filter['filter_id'];
+            } else {
+                $filter_data = array(
+                    'filter_group_id' => 5,
+                    'filter_description' => array(
+                        1 => array(
+                            'name' => $filter_name
+                        )
+                    )
+                );
+                $filter_id = $model_filter->autoAddFilter($filter_data);
+                $filter_info[] = $filter_id;
+            }
+
+            echo 'Добавили фильтр по стране: ' . $filter_name . PHP_EOL;
 
         }
     }
+    return $filter_info;
+}
+
+
+function generateManufacturer($params) : int {
+    global $model_manufacturer;
+    foreach($params as $param) {
+        if($param['name'] == 'Производитель') {
+            $data_array = explode(', ', mb_strtolower(strval($param), 'utf-8'));
+            $manufacturer_name = $data_array[0];
+        
+            $filter_data = array(
+                'filter_name' => $manufacturer_name
+            );
+        
+            $existing_manufacturers = $model_manufacturer->getManufacturers($filter_data);
+        
+            $flag = 0;
+            $manufacturer = array();
+        
+            foreach($existing_manufacturers as $existing_manufacturer) {
+                if($manufacturer_name == $existing_manufacturer['name']) {
+                    $flag = 1;
+                    $manufacturer = $existing_manufacturer;
+                }
+            }
+
+            if($flag) {
+                echo 'Добавили производителя: ' . $manufacturer_name . PHP_EOL;
+                return $manufacturer['manufacturer_id'];
+            } else {
+                $data = array(
+                    'name' => $manufacturer_name,
+                    'sort_order' => 0,
+                    'manufacturer_description' => array(
+                        1 => array(
+                            'description' => ''
+                        )
+                    ),
+                );
+
+                $manufacturer_id = $model_manufacturer->autoAddManufacturer($data);
+                echo 'Добавили производителя: ' . $manufacturer_name . PHP_EOL;
+                return $manufacturer_id;
+            }
+        }
+    }
+}
+
+
+function updatingProductStocks() {
+    global $model;
+
+    $updating_categories = array(
+        87
+    );
+
+    $array = $model->getProductsByCategoryId(87);
+
+    print_r(count($array));
+
+
+
 }
